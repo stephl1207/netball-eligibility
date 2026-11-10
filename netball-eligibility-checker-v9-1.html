@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Netball Eligibility Checker</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#202536;background:#f4f6fb}
+*{box-sizing:border-box}body{margin:0;padding:18px 12px 36px}.wrap{max-width:620px;margin:auto}
+h1{font-size:1.55rem;margin:0 0 6px}.intro{color:#586174;margin:0 0 18px;line-height:1.45}
+.panel{background:white;border:1px solid #e1e5ee;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 8px #1725540a}
+h2{font-size:1.1rem;margin:0 0 12px}.entry{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin:10px 0}
+label{display:block;font-size:.82rem;font-weight:650;margin-bottom:5px;color:#485166}
+select,button{font:inherit}select{width:100%;padding:11px 9px;border:1px solid #cbd2df;border-radius:10px;background:white;min-width:0}
+button{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer}
+.remove{background:#f1f3f8;color:#535d70;padding:11px 12px}.primary{background:#3949ab;color:white;width:100%;margin-top:8px}.secondary{background:#eef0ff;color:#303f9f;width:100%}
+.note{font-size:.88rem;color:#606a7e;line-height:1.45}.result{border-radius:12px;padding:14px;margin-top:12px;background:#eef7f1;border:1px solid #cce8d5}
+.result h3{margin:0 0 8px;font-size:1.05rem}.positions{font-size:1.35rem;font-weight:800;line-height:1.5;overflow-wrap:anywhere}
+.error{background:#fff3ed;border-color:#f3d0bf}.muted{color:#667085}.rules{font-size:.9rem;line-height:1.55}.rules ul{padding-left:20px;margin:7px 0}
+@media(max-width:420px){body{padding:12px 9px 28px}.panel{padding:13px}.entry{gap:6px}.remove{padding:10px 8px}}
+</style>
+</head>
+<body><main class="wrap">
+<h1>Netball Eligibility Checker</h1>
+<p class="intro">Add the games you have played, in any order, then check which positions are available for another team.</p>
+<section class="panel">
+<h2>1. Add your games</h2><div id="entries"></div>
+<button class="secondary" id="add">+ Add another game</button>
+<p class="note">Add Main team, Second team and Sub games in any order. You can add up to 4 entries.</p>
+</section>
+<section class="panel">
+<h2>2. What do you want to check?</h2>
+<label for="target">Team / type of play</label>
+<select id="target"><option value="second">Second team / Dual signing</option><option value="sub">Subbing</option><option value="main">Main team</option></select>
+<button class="primary" id="check">Check eligible positions</button><div id="result" aria-live="polite"></div>
+</section>
+<section class="panel rules">
+<h2>Rules used</h2><p><b>Position groups</b></p>
+<ul><li>Central: C, WA, WD</li><li>Goal attacking: GA, GS</li><li>Goal defence: GD, GK</li></ul>
+<p><b>Dual signing:</b> You cannot play the exact position you play for your Main / first team. A position group used in a Sub game is also unavailable for Second team play.</p>
+<p><b>Subbing:</b> You cannot sub in a position group already represented by a position you play for your Main or Second team, or in an exact position you have already subbed in.</p>
+</section></main>
+<script>
+const POS=['GK','GD','WD','C','WA','GA','GS'];
+const GROUP={GK:'Goal defence',GD:'Goal defence',GA:'Goal attacking',GS:'Goal attacking',C:'Central',WA:'Central',WD:'Central'};
+const entries=document.getElementById('entries'),result=document.getElementById('result');
+function addEntry(type='main',pos=''){
+ if(entries.children.length>=4)return;
+ const row=document.createElement('div');row.className='entry';
+ const team=document.createElement('div'),place=document.createElement('div');team.innerHTML='<label>Game type</label>';
+ const ts=document.createElement('select');
+ [['main','Main team'],['second','Second team'],['sub','Sub']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;ts.append(o)});ts.value=type;team.append(ts);
+ place.innerHTML='<label>Position</label>';const ps=document.createElement('select');const empty=document.createElement('option');empty.value='';empty.textContent='Choose';ps.append(empty);
+ POS.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;ps.append(o)});ps.value=pos;place.append(ps);
+ const rm=document.createElement('button');rm.className='remove';rm.type='button';rm.textContent='Remove';rm.onclick=()=>{row.remove();refresh()};
+ row.append(team,place,rm);entries.append(row);refresh();
+}
+function refresh(){const b=document.getElementById('add');b.disabled=entries.children.length>=4;b.style.opacity=b.disabled?'.5':'1'}
+function read(){
+ const rows=[...entries.children].map(r=>({type:r.children[0].querySelector('select').value,pos:r.children[1].querySelector('select').value}));
+ if(rows.some(x=>!x.pos))throw Error('Please choose a position for every game you have added.');
+ const main=rows.filter(x=>x.type==='main'),second=rows.filter(x=>x.type==='second');
+ if(main.length>1||second.length>1)throw Error('Please enter only one Main team game and one Second team game.');
+ return {rows,main:main[0]?.pos,second:second[0]?.pos,subs:rows.filter(x=>x.type==='sub').map(x=>x.pos)};
+}
+document.getElementById('add').onclick=()=>addEntry('sub');
+document.getElementById('check').onclick=()=>{
+ result.innerHTML='';
+ try{
+ const d=read(),target=document.getElementById('target').value;let eligible=[],why='';
+ if(target==='second'){
+  if(!d.main)throw Error('Add your Main team position first so the checker knows which position is unavailable for dual signing.');
+  const subGroups=new Set(d.subs.map(p=>GROUP[p]));
+  eligible=POS.filter(p=>p!==d.main&&!subGroups.has(GROUP[p]));
+  why=`Your Main team position (${d.main}) is excluded. Your Sub game${d.subs.length===1?'':'s'} also exclude${d.subs.length===1?'s':''} the whole position group${d.subs.length===1?'':'s'} used: ${d.subs.length?[...subGroups].join(', '):'none'}.`;
+ }else if(target==='sub'){
+  if(!d.main&&!d.second)throw Error('Add at least one Main team or Second team position before checking Sub positions.');
+  const blockedGroups=new Set([d.main,d.second].filter(Boolean).map(p=>GROUP[p]));
+  const alreadySubbed=new Set(d.subs);
+  eligible=POS.filter(p=>!blockedGroups.has(GROUP[p])&&!alreadySubbed.has(p));
+  const used=[...alreadySubbed];
+  why=`Your Main / Second team position${blockedGroups.size===1?'':'s'} block${blockedGroups.size===1?'s':''} these group${blockedGroups.size===1?'':'s'}: ${[...blockedGroups].join(', ')}. You also cannot sub in an exact position you have already subbed in: ${used.length?used.join(', '):'none yet'}.`;
+ }else{
+  eligible=d.main?[d.main]:[];why=d.main?`Your recorded Main team position is ${d.main}.`:'No Main team game has been entered.';
+ }
+ const box=document.createElement('div');box.className='result'+(eligible.length?'':' error');
+ const h=document.createElement('h3');h.textContent=target==='second'?'Second team / Dual signing':target==='sub'?'Subbing':'Main team';box.append(h);
+ const p=document.createElement('div');p.className='positions';p.textContent=eligible.length?eligible.join(' · '):'No eligible positions';box.append(p);
+ const detail=document.createElement('p');detail.className='note';detail.textContent=why;box.append(detail);result.append(box);
+ }catch(e){const box=document.createElement('div');box.className='result error';box.textContent=e.message;result.append(box)}
+};
+addEntry('main');addEntry('sub');
+</script></body></html>
