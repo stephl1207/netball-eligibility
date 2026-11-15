@@ -37,7 +37,7 @@ button{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:poin
 <section class="panel rules">
 <h2>Rules used</h2><p><b>Position groups</b></p>
 <ul><li>Central: C, WA, WD</li><li>Goal attacking: GA, GS</li><li>Goal defence: GD, GK</li></ul>
-<p><b>Dual signing:</b> You cannot play the exact position you play for your Main / first team. A position group used in a Sub game is also unavailable for Second team play.</p>
+<p><b>Dual signing:</b> You cannot play the exact position you play for your Main / first team. A position group used in a Sub game is unavailable for Second team play unless your previous Main/Sub games have already covered all three position groups.</p>
 <p><b>Subbing:</b> You cannot sub in a position group already represented by a position you play for your Main or Second team, or in an exact position you have already subbed in.</p>
 </section></main>
 <script>
@@ -70,9 +70,12 @@ document.getElementById('check').onclick=()=>{
  const d=read(),target=document.getElementById('target').value;let eligible=[],why='';
  if(target==='second'){
   if(!d.main)throw Error('Add your Main team position first so the checker knows which position is unavailable for dual signing.');
+  const previousPositions=d.rows.filter(x=>x.type==='main'||x.type==='sub').map(x=>x.pos);
+  const coveredGroups=new Set(previousPositions.map(p=>GROUP[p]));
+  const allThreeGroupsCovered=['Central','Goal attacking','Goal defence'].every(g=>coveredGroups.has(g));
   const subGroups=new Set(d.subs.map(p=>GROUP[p]));
-  eligible=POS.filter(p=>p!==d.main&&!subGroups.has(GROUP[p]));
-  why=`Your Main team position (${d.main}) is excluded. Your Sub game${d.subs.length===1?'':'s'} also exclude${d.subs.length===1?'s':''} the whole position group${d.subs.length===1?'':'s'} used: ${d.subs.length?[...subGroups].join(', '):'none'}.`;
+  eligible=POS.filter(p=>p!==d.main&&(allThreeGroupsCovered||!subGroups.has(GROUP[p])));
+  why=`Your Main team position (${d.main}) is excluded. ${d.subs.length?`Your Sub game${d.subs.length===1?'':'s'} use ${[...subGroups].join(', ')}. `:'No Sub positions have been entered. '}${allThreeGroupsCovered?'Your previous Main/Sub games cover all three position groups, so the Sub-group restriction no longer applies.':`Your previous Main/Sub games cover ${coveredGroups.size} of the 3 position groups, so positions in the Sub group${subGroups.size===1?'':'s'} remain unavailable.`}`;
  }else if(target==='sub'){
   if(!d.main&&!d.second)throw Error('Add at least one Main team or Second team position before checking Sub positions.');
   const blockedGroups=new Set([d.main,d.second].filter(Boolean).map(p=>GROUP[p]));
