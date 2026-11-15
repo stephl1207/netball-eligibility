@@ -79,10 +79,13 @@ document.getElementById('check').onclick=()=>{
  }else if(target==='sub'){
   if(!d.main&&!d.second)throw Error('Add at least one Main team or Second team position before checking Sub positions.');
   const blockedGroups=new Set([d.main,d.second].filter(Boolean).map(p=>GROUP[p]));
+  const previousPositions=d.rows.filter(x=>x.type==='main'||x.type==='second'||x.type==='sub').map(x=>x.pos);
+  const coveredGroups=new Set(previousPositions.map(p=>GROUP[p]));
+  const allThreeGroupsCovered=['Central','Goal attacking','Goal defence'].every(g=>coveredGroups.has(g));
+  const subGroups=new Set(d.subs.map(p=>GROUP[p]));
   const alreadySubbed=new Set(d.subs);
-  eligible=POS.filter(p=>!blockedGroups.has(GROUP[p])&&!alreadySubbed.has(p));
-  const used=[...alreadySubbed];
-  why=`Your Main / Second team position${blockedGroups.size===1?'':'s'} block${blockedGroups.size===1?'s':''} these group${blockedGroups.size===1?'':'s'}: ${[...blockedGroups].join(', ')}. You also cannot sub in an exact position you have already subbed in: ${used.length?used.join(', '):'none yet'}.`;
+  eligible=POS.filter(p=>!blockedGroups.has(GROUP[p])&&(allThreeGroupsCovered||!subGroups.has(GROUP[p]))&&!alreadySubbed.has(p));
+  why=`Your Main / Second team position${blockedGroups.size===1?'':'s'} block${blockedGroups.size===1?'s':''} these group${blockedGroups.size===1?'':'s'}: ${[...blockedGroups].join(', ')||'none'}. ${d.subs.length?`Your previous Sub game${d.subs.length===1?'':'s'} also block${d.subs.length===1?'s':''} the ${[...subGroups].join(', ')} group${subGroups.size===1?'':'s'} unless all three groups have already been covered. `:'No previous Sub positions to exclude. '}${allThreeGroupsCovered?'Your previous games cover all three position groups, so the Sub-group restriction is lifted.':'Your previous games cover '+coveredGroups.size+' of the 3 position groups, so the previous Sub group remains blocked.'} You cannot repeat an exact Sub position: ${[...alreadySubbed].join(', ')||'none yet'}.`;
  }else{
   eligible=d.main?[d.main]:[];why=d.main?`Your recorded Main team position is ${d.main}.`:'No Main team game has been entered.';
  }
